@@ -1,13 +1,15 @@
 ﻿using AutoMapper;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebApiAutores.DTOs;
 using WebApiAutores.Entidades;
 
-namespace WebApiAutores.Controllers
-{
-    [ApiController]
+namespace WebApiAutores.Controllers {
+	[ApiController]
 	[Route( "api/autores" )]
+	[Authorize( AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Policy = "EsAdmin" )]
 	public class AutoresController: ControllerBase {
 		private readonly ApplicationDbContext context;
 		private readonly IMapper mapper;
@@ -19,12 +21,8 @@ namespace WebApiAutores.Controllers
 			this.configuration = configuration;
 		}
 
-		[HttpGet("configuraciones")]
-		public ActionResult<string> ObtenerConfiguracion() {
-			return configuration["apellido"];
-		}
-
 		[HttpGet] // api/autores
+		[AllowAnonymous]
 		public async Task<ActionResult<List<AutorDTO>>> Get() {
 			var autores = await context.Autores.ToListAsync();
 

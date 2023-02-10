@@ -1,4 +1,7 @@
 ﻿using AutoMapper;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebApiAutores.DTOs;
@@ -10,10 +13,12 @@ namespace WebApiAutores.Controllers {
 	public class ComentariosController: ControllerBase {
 		private readonly ApplicationDbContext context;
 		private readonly IMapper mapper;
+		private readonly UserManager<IdentityUser> userManager;
 
-		public ComentariosController( ApplicationDbContext context, IMapper mapper ) {
+		public ComentariosController( ApplicationDbContext context, IMapper mapper, UserManager<IdentityUser> userManager ) {
 			this.context = context;
 			this.mapper = mapper;
+			this.userManager = userManager;
 		}
 
 		[HttpGet]
@@ -44,7 +49,14 @@ namespace WebApiAutores.Controllers {
 		}
 
 		[HttpPost]
+		[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 		public async Task<ActionResult> Post( int libroId, ComentarioCreacionDTO comentarioDTO ) {
+
+			var emailClaim = HttpContext.User.Claims.Where( claim => claim.Type == "email" ).FirstOrDefault();
+			var email = emailClaim?.Value ?? "";
+			var usuario = await userManager.FindByEmailAsync( email );
+			var usuarioId = usuario.Id;
+			
 			var existeLibro = await context.Libros
 				.AnyAsync( x => x.Id == libroId );
 
@@ -55,6 +67,7 @@ namespace WebApiAutores.Controllers {
 			var comentario = mapper.Map<Comentario>( comentarioDTO );
 
 			comentario.LibroId = libroId;
+			comentario.UsuarioId = usuarioId;
 
 			context.Add( comentario );
 
