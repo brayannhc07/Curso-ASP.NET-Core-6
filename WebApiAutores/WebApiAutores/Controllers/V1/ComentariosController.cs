@@ -6,10 +6,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebApiAutores.DTOs;
 using WebApiAutores.Entidades;
+using WebApiAutores.Utilidades;
 
-namespace WebApiAutores.Controllers {
+namespace WebApiAutores.Controllers.V1 {
 	[ApiController]
-	[Route( "api/libros/{libroId:int}/comentarios" )]
+	[Route( "api/v1/libros/{libroId:int}/comentarios" )]
 	public class ComentariosController: ControllerBase {
 		private readonly ApplicationDbContext context;
 		private readonly IMapper mapper;
@@ -21,18 +22,20 @@ namespace WebApiAutores.Controllers {
 			this.userManager = userManager;
 		}
 
-		[HttpGet]
-		public async Task<ActionResult<List<ComentarioDTO>>> Get( int libroId ) {
+		[HttpGet( Name = "obtenerComentarios" )]
+		public async Task<ActionResult<List<ComentarioDTO>>> Get( int libroId, [FromQuery] PaginacionDTO paginacionDTO ) {
 			var existeLibro = await context.Libros
 				.AnyAsync( x => x.Id == libroId );
 
 			if( !existeLibro ) {
 				return NotFound();
 			}
+			var queryable = context.Comentarios.Where( x => x.LibroId == libroId ).AsQueryable();
 
-			var comentarios = await context.Comentarios
-				.Where( x => x.LibroId == libroId )
-				.ToListAsync();
+			await HttpContext.InsertarParametrosPaginacionEnCabecera( queryable );
+
+			var comentarios = await queryable.OrderBy( comentario => comentario.Id )
+				.Paginar( paginacionDTO ).ToListAsync();
 			return mapper.Map<List<ComentarioDTO>>( comentarios );
 		}
 
@@ -48,15 +51,15 @@ namespace WebApiAutores.Controllers {
 			return mapper.Map<ComentarioDTO>( comentario );
 		}
 
-		[HttpPost]
-		[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+		[HttpPost( Name = "crearComentario" )]
+		[Authorize( AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme )]
 		public async Task<ActionResult> Post( int libroId, ComentarioCreacionDTO comentarioDTO ) {
 
 			var emailClaim = HttpContext.User.Claims.Where( claim => claim.Type == "email" ).FirstOrDefault();
 			var email = emailClaim?.Value ?? "";
 			var usuario = await userManager.FindByEmailAsync( email );
 			var usuarioId = usuario.Id;
-			
+
 			var existeLibro = await context.Libros
 				.AnyAsync( x => x.Id == libroId );
 
@@ -78,8 +81,8 @@ namespace WebApiAutores.Controllers {
 			return CreatedAtRoute( "obtenerComentario", new { id = comentario.Id, libroId }, comentarioRespuesta );
 		}
 
-		[HttpPut("{id:int}")]
-		public async Task<ActionResult> Put(int libroId, int id, ComentarioCreacionDTO comentarioRequest) {
+		[HttpPut( "{id:int}", Name = "actualizarComentario" )]
+		public async Task<ActionResult> Put( int libroId, int id, ComentarioCreacionDTO comentarioRequest ) {
 			var existeLibro = await context.Libros
 				.AnyAsync( x => x.Id == libroId );
 
@@ -90,7 +93,7 @@ namespace WebApiAutores.Controllers {
 			var existeComentario = await context.Comentarios
 				.AnyAsync( x => x.Id == id );
 
-			if(!existeComentario ) {
+			if( !existeComentario ) {
 				return NotFound();
 			}
 
